@@ -18,7 +18,7 @@ vec3 color(const ray& r, hitable* world, int depth)
 		ray scattered;
 		vec3 attenuation;
 
-		if (depth < 50 && rec.mat->scatter(r, rec, attenuation, scattered))
+		if (depth < 30 && rec.mat->scatter(r, rec, attenuation, scattered))
 		{
 			return attenuation * color(scattered, world, depth + 1);
 		}
@@ -40,9 +40,9 @@ vec3 color(const ray& r, hitable* world, int depth)
 
 int main()
 {
-	int screenWidth = 720;
-	int screenHeight = 480;
-	int numSamples = 250;
+	int screenWidth = 1920;
+	int screenHeight = 1080;
+	int numSamples = 1000;
 
 	float aspectRatio = (float)screenWidth / (float)screenHeight;
 
@@ -88,14 +88,14 @@ int main()
 				vec3 center(a + 0.9f * rand::GetFloat01(), 0.2f, b + 0.9f * rand::GetFloat01());
 				if ((center - vec3(1, 0.2f, 0)).length() > 0.9f)
 				{
-					if (mat < 0.8f) // diffuse
+					if (mat < 0.75f) // diffuse
 					{
 						float red = rand::GetFloat01() * rand::GetFloat01();
 						float green = rand::GetFloat01() * rand::GetFloat01();
 						float blue = rand::GetFloat01() * rand::GetFloat01();
 						list[i++] = new sphere(center, 0.2f, new lambertian(vec3(red, green, blue)));
 					}
-					else if (mat < 0.95f) // metal
+					else if (mat < 0.9f) // metal
 					{
 						float red = 0.5f * (1.0f + rand::GetFloat01());
 						float green = 0.5f * (1.0f + rand::GetFloat01());
@@ -118,11 +118,11 @@ int main()
 		hitable* world = new hitable_list(list, i);
 #endif
 
-		vec3 eye(7, 2, 2);
-		vec3 lookAt(0, 0, -1);
-		float aperture = 2.0f;
-		float dist_to_focus = (eye - lookAt).length();
-		camera cam(eye, lookAt, vec3(0, 1, 0), 45, aspectRatio, aperture, dist_to_focus);
+		vec3 eye(10, 2.0f, 2);
+		vec3 lookAt(0, 0, 0);
+		float aperture = 0.075f;
+		float dist_to_focus = (eye - lookAt).length() - 5;
+		camera cam(eye, lookAt, vec3(0, 1, 0), 30, aspectRatio, aperture, dist_to_focus);
 
 		for (int j = screenHeight - 1; j >= 0; j--)
 		{
@@ -150,9 +150,13 @@ int main()
 				int ib = (int)(255.99 * col[2]);
 				imageOut << ir << ' ' << ig << ' ' << ib << '\n';
 			}
-		}
 
-		delete world;
+			if (j % (screenHeight / 10) == 0)
+			{
+				int percentComplete = 100 - (int)(100.0f * (j / (float)screenHeight));
+				printf("%d%% complete...\n", percentComplete);
+			}
+		}
 
 		imageOut.close();
 	}
