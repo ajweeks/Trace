@@ -40,58 +40,121 @@ vec3 color(const ray& r, hitable* world, int depth)
 
 int main()
 {
-	int nx = 200;
-	int ny = 100;
-	int ns = 100;
+	int screenWidth = 720;
+	int screenHeight = 480;
+	int numSamples = 250;
 
-	std::ofstream out;
-	out.open("./../../../out/result.ppm", std::fstream::out);
+	float aspectRatio = (float)screenWidth / (float)screenHeight;
 
-	if (out.is_open())
+	std::ofstream imageOut;
+	imageOut.open("./../../../out/result.ppm", std::fstream::out);
+
+	if (imageOut.is_open())
 	{
-		out << "P3\n" << nx << ' ' << ny << "\n255\n";
+		imageOut << "P3\n" << screenWidth << ' ' << screenHeight << "\n255\n";
 
 		vec3 lower_left_corner(-2.0f, -1.0f, -1.0f);
 		vec3 horizontal(4.0f, 0.0f, 0.0f);
 		vec3 vertical(0.0f, 2.0f, 0.0f);
 		vec3 origin(0.0f);
 
-		hitable* list[4];
-		list[0] = new sphere(vec3(0, 0, -1), 0.5f, new lambertian(vec3(0.8f, 0.3f, 0.3f)));
+#if 0
+		constexpr int numHitables = 5;
+		hitable* list[numHitables];
+		list[0] = new sphere(vec3(0, 0, -1), 0.5f, new lambertian(vec3(0.1f, 0.2f, 0.5f)));
 		list[1] = new sphere(vec3(0, -100.5f, -1), 100.0f, new lambertian(vec3(0.8f, 0.8f, 0.0f)));
-		list[2] = new sphere(vec3(1, 0, -1), 0.5f, new metal(vec3(0.8f, 0.6f, 0.2f)));
-		list[3] = new sphere(vec3(-1, 0, -1), 0.5f, new metal(vec3(0.8f, 0.8f, 0.8f)));
-		hitable* world = new hitable_list(list, 4);
+		list[2] = new sphere(vec3(1, 0, -1), 0.5f, new metal(vec3(0.8f, 0.6f, 0.2f), 0.0f));
+		list[3] = new sphere(vec3(-1, 0, -1), 0.5f, new dielectric(1.5f));
+		list[4] = new sphere(vec3(-1, 0, -1), -0.45f, new dielectric(1.5f));
+		hitable* world = new hitable_list(list, numHitables);
+#elif 0
+		float R = cos((float)M_PI / 4.0f);
+		constexpr int numHitables = 2;
+		hitable* list[numHitables];
+		list[0] = new sphere(vec3(-R, 0, -1), R, new lambertian(vec3(0, 0, 1)));
+		list[1] = new sphere(vec3(R, 0, -1), R, new lambertian(vec3(1, 0, 0)));
+		hitable* world = new hitable_list(list, numHitables);
+#else
+		constexpr int numHitables = 500;
+		hitable* list[numHitables + 1];
+		list[0] = new sphere(vec3(0, -1000, 0), 1000, new lambertian(vec3(0.5f, 0.5f, 0.5f)));
 
-		camera cam;
-
-		for (int j = ny - 1; j >= 0; j--)
+		int i = 1;
+		for (int a = -11; a < 11; a++)
 		{
-			for (int i = 0; i < nx; i++)
+			for (int b = -11; b < 11; b++)
+			{
+				float mat = rand::GetFloat01();
+				vec3 center(a + 0.9f * rand::GetFloat01(), 0.2f, b + 0.9f * rand::GetFloat01());
+				if ((center - vec3(1, 0.2f, 0)).length() > 0.9f)
+				{
+					if (mat < 0.8f) // diffuse
+					{
+						float red = rand::GetFloat01() * rand::GetFloat01();
+						float green = rand::GetFloat01() * rand::GetFloat01();
+						float blue = rand::GetFloat01() * rand::GetFloat01();
+						list[i++] = new sphere(center, 0.2f, new lambertian(vec3(red, green, blue)));
+					}
+					else if (mat < 0.95f) // metal
+					{
+						float red = 0.5f * (1.0f + rand::GetFloat01());
+						float green = 0.5f * (1.0f + rand::GetFloat01());
+						float blue = 0.5f * (1.0f + rand::GetFloat01());
+						float fuzziness = 0.5f * rand::GetFloat01();
+						list[i++] = new sphere(center, 0.2f, new metal(vec3(red, green, blue), fuzziness));
+					}
+					else // glass
+					{
+						list[i++] = new sphere(center, 0.2f, new dielectric(1.5f));
+					}
+				}
+			}
+		}
+
+		list[i++] = new sphere(vec3(0, 1, 0), 1.0f, new dielectric(1.5f));
+		list[i++] = new sphere(vec3(-4, 1, 0), 1.0f, new lambertian(vec3(0.4f, 0.2f, 0.1f)));
+		list[i++] = new sphere(vec3(4, 1, 0), 1.0f, new metal(vec3(0.7f, 0.6f, 0.5f), 0.0f));
+
+		hitable* world = new hitable_list(list, i);
+#endif
+
+		vec3 eye(7, 2, 2);
+		vec3 lookAt(0, 0, -1);
+		float aperture = 2.0f;
+		float dist_to_focus = (eye - lookAt).length();
+		camera cam(eye, lookAt, vec3(0, 1, 0), 45, aspectRatio, aperture, dist_to_focus);
+
+		for (int j = screenHeight - 1; j >= 0; j--)
+		{
+			for (int i = 0; i < screenWidth; i++)
 			{
 				vec3 col = vec3(0.0f);
 
-				for (int s = 0; s < ns; s++)
+				for (int s = 0; s < numSamples; s++)
 				{
 					float rand1f = rand::GetFloat01();
 					float rand2f = rand::GetFloat01();
-					float u = (float)(i + rand1f) / (float)nx;
-					float v = (float)(j + rand2f) / (float)ny;
+					float u = (float)(i + rand1f) / (float)screenWidth;
+					float v = (float)(j + rand2f) / (float)screenHeight;
 
 					ray r = cam.get_ray(u, v);
 					vec3 p = r.point_at_parameter(2.0f);
 					col += color(r, world, 0);
 				}
-				col /= (float)ns;
+				col /= (float)numSamples;
 
 				col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
 
 				int ir = (int)(255.99 * col[0]);
 				int ig = (int)(255.99 * col[1]);
 				int ib = (int)(255.99 * col[2]);
-				out << ir << ' ' << ig << ' ' << ib << '\n';
+				imageOut << ir << ' ' << ig << ' ' << ib << '\n';
 			}
 		}
+
+		delete world;
+
+		imageOut.close();
 	}
 
 	std::cout << "Done!\n";
