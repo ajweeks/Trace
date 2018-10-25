@@ -40,9 +40,9 @@ vec3 color(const ray& r, hitable* world, int depth)
 
 int main()
 {
-	int screenWidth = 1920;
-	int screenHeight = 1080;
-	int numSamples = 1000;
+	int screenWidth = 480;
+	int screenHeight = 360;
+	int numSamples = 100;
 
 	float aspectRatio = (float)screenWidth / (float)screenHeight;
 
